@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func setupRouter() *gin.Engine {
+func startServer() error {
 	r := gin.Default()
 
 	r.GET("/", func(c *gin.Context) {
@@ -13,11 +13,13 @@ func setupRouter() *gin.Engine {
 		})
 	})
 
-	return r
+	println("Starting server on :18080")
+	return r.Run(":18080")
 }
 
 func main() {
-	r := setupRouter()
-
-	r.Run(":18080")
+	if err := startServer(); err != nil {
+		println("Error starting server:", err.Error())
+	}
 }
+
