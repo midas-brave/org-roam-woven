@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func main() {
+func setupRouter() *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/", func(c *gin.Context) {
@@ -13,6 +13,11 @@ func main() {
 		})
 	})
 
-	r.Run(":18080")
+	return r
 }
 
+func main() {
+	r := setupRouter()
+
+	r.Run(":18080")
+}

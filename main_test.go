@@ -5,25 +5,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRootEndpoint(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+	r := setupRouter()
 
-	r := gin.Default()
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "Welcome to org-roam-woven!",
-		})
-	})
-
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
 	r.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, 200, w.Code)
 	assert.JSONEq(t, `{"message": "Welcome to org-roam-woven!"}`, w.Body.String())
 }
-
