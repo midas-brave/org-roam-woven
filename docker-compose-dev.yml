@@ -1,0 +1,18 @@
+services:
+  emacs:
+    build:
+      context: ./packaging
+      dockerfile: Dockerfile.emacs
+    volumes:
+      - data_volume:/root/org-roam
+    command: emacs --fg-daemon
+  org-roam-woven:
+    build:
+      dockerfile: ./packaging/Dockerfile.org-roam-woven
+    user: root
+    volumes:
+      - data_volume:/root/org-roam
+    ports:
+      - 127.0.0.1:18080:18080
+volumes:
+  data_volume:
