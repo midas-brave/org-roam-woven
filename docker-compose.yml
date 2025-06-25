@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  emacs:
+    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/org-roam-woven}/emacs:${TAG:-latest}
+    container_name: org-roam-emacs
+    restart: unless-stopped
+    volumes:
+      - org_roam_data:/root/org-roam:rw
+    networks:
+      - org-roam-network
+    command: emacs --fg-daemon
+
+  org-roam-woven:
+    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/org-roam-woven}/org-roam-woven:${TAG:-latest}
+    container_name: org-roam-woven-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-18080}:18080"
+    volumes:
+      - org_roam_data:/root/org-roam:ro
+    networks:
+      - org-roam-network
+    environment:
+      - GIN_MODE=${GIN_MODE:-release}
+      - PORT=18080
+      - ORG_ROAM_PATH=/root/org-roam
+    depends_on:
+      - emacs
+
+volumes:
+  org_roam_data:
+    driver: local
+
+networks:
+  org-roam-network:
+    driver: bridge

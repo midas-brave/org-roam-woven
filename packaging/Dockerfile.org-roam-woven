@@ -1,13 +1,43 @@
-FROM golang:alpine AS build
-ADD . /go/src/app
-WORKDIR /go/src/app
-# RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
-RUN go build
+# Build stage
+FROM golang:1.24.4-alpine AS builder
 
-FROM alpine:latest
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /app
+
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the binary with optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a -installsuffix cgo \
+    -o org-roam-woven .
+
+# Runtime stage - using distroless for security and minimal size
+FROM gcr.io/distroless/static-debian12:nonroot
+
+LABEL org.opencontainers.image.title="org-roam-woven"
+LABEL org.opencontainers.image.description="A service for org-roam integration"
 LABEL org.opencontainers.image.authors="master@southfox.me"
+LABEL org.opencontainers.image.source="https://github.com/your-org/org-roam-woven"
 
-COPY --from=build /go/src/app/org-roam-woven /usr/bin/org-roam-woven
+# Copy ca-certificates from builder stage
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy the binary with proper permissions
+COPY --from=builder --chown=nonroot:nonroot /app/org-roam-woven /usr/local/bin/org-roam-woven
+
+# Use non-root user
+USER nonroot:nonroot
+
+# Expose port
 EXPOSE 18080
-USER 65534
-CMD ["/usr/bin/org-roam-woven"]
+
+# Run the binary
+ENTRYPOINT ["/usr/local/bin/org-roam-woven"]
