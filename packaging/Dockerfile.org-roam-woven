@@ -1,7 +1,20 @@
 FROM golang:alpine AS build
-ADD . /go/src/app
+
+RUN mkdir -p /go/src/app
+ADD ./go.mod /go/src/app
+ADD ./go.sum /go/src/app
 WORKDIR /go/src/app
-# RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
+
+ARG CN_MIRROR
+RUN if [ "$CN_MIRROR" = "true" ]; then \
+    go env -w GO111MODULE=on && \
+    go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct && \
+    go mod download; \
+    else \
+    go mod download; \
+    fi
+
+ADD . /go/src/app
 RUN go build
 
 FROM alpine:latest

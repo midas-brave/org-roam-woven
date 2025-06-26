@@ -3,12 +3,16 @@ services:
     build:
       context: ./packaging
       dockerfile: Dockerfile.emacs
+      args:
+        - CN_MIRROR=${CN_MIRROR}
     volumes:
       - data_volume:/root/org-roam
     command: emacs --fg-daemon
   org-roam-woven:
     build:
       dockerfile: ./packaging/Dockerfile.org-roam-woven
+      args:
+        - CN_MIRROR=${CN_MIRROR}
     user: root
     volumes:
       - data_volume:/root/org-roam
