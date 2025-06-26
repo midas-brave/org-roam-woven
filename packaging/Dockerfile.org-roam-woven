@@ -15,7 +15,7 @@ RUN if [ "$CN_MIRROR" = "true" ]; then \
     fi
 
 ADD . /go/src/app
-RUN go build
+RUN CGO_ENABLED=0 go build
 
 FROM alpine:latest
 LABEL org.opencontainers.image.authors="master@southfox.me"
