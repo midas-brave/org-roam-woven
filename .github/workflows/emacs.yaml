@@ -1,9 +1,17 @@
-name: Build and Push Docker Images
+name: Emacs Docker Build
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    paths:
+      - 'packaging/Dockerfile.emacs'
+      - 'packaging/init.el'
+      - '.github/workflows/emacs.yaml'
+  pull_request:
+    paths:
+      - 'packaging/Dockerfile.emacs'
+      - 'packaging/init.el'
+      - '.github/workflows/emacs.yaml'
   workflow_dispatch:
     inputs:
       use_cn_mirror:
@@ -20,7 +28,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
+  emacs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,19 +48,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for org-roam-woven
-        id: meta-app
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Extract metadata (tags, labels) for emacs
+      - name: Extract metadata for emacs
         id: meta-emacs
         uses: docker/metadata-action@v5
         with:
@@ -64,27 +60,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push org-roam-woven Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./packaging/Dockerfile.org-roam-woven
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta-app.outputs.tags }}
-          labels: ${{ steps.meta-app.outputs.labels }}
-          build-args: |
-            CN_MIRROR=${{ github.event.inputs.use_cn_mirror || 'false' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Build and push emacs Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./packaging
           file: ./packaging/Dockerfile.emacs
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-emacs.outputs.tags }}
           labels: ${{ steps.meta-emacs.outputs.labels }}
           build-args: |
@@ -93,14 +75,9 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Success notification
+        if: success() && github.event_name != 'pull_request'
         run: |
-          echo "🎉 Successfully built and pushed Docker images!"
+          echo "🎉 Successfully built and pushed Emacs Docker image!"
           echo ""
-          echo "📦 Available images:"
-          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:latest"
+          echo "📦 Available image:"
           echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:latest"
-          echo ""
-          echo "🚀 Quick start:"
-          echo "docker run -p 18080:18080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:latest"
-          echo ""
-          echo "🔗 Visit: http://localhost:18080"

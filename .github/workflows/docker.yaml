@@ -1,0 +1,94 @@
+name: Docker Build and Push
+
+on:
+  # Run after Go workflow succeeds
+  workflow_run:
+    workflows: ["Go Build and Test"]
+    types:
+      - completed
+    branches: [main]
+  # Also run on tag push
+  push:
+    tags: ["v*"]
+  # Manual trigger with CN mirror option
+  workflow_dispatch:
+    inputs:
+      use_cn_mirror:
+        description: "Use Chinese mirror sources"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    # Only run if the triggering workflow succeeded or this was triggered directly
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: org-roam-woven-binary
+          path: .
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for org-roam-woven
+        id: meta-app
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push org-roam-woven Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packaging/Dockerfile.org-roam-woven
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
+          build-args: |
+            CN_MIRROR=${{ github.event.inputs.use_cn_mirror || 'false' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Success notification
+        run: |
+          echo "🎉 Successfully built and pushed Docker images!"
+          echo ""
+          echo "📦 Available images:"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:latest"
+          echo ""
+          echo "🚀 Quick start:"
+          echo "docker run -p 18080:18080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:latest"
+          echo ""
+          echo "🔗 Visit: http://localhost:18080"
