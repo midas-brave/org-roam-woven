@@ -1,0 +1,106 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      use_cn_mirror:
+        description: "Use Chinese mirror sources"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for org-roam-woven
+        id: meta-app
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata (tags, labels) for emacs
+        id: meta-emacs
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push org-roam-woven Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packaging/Dockerfile.org-roam-woven
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
+          build-args: |
+            CN_MIRROR=${{ github.event.inputs.use_cn_mirror || 'false' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push emacs Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packaging
+          file: ./packaging/Dockerfile.emacs
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-emacs.outputs.tags }}
+          labels: ${{ steps.meta-emacs.outputs.labels }}
+          build-args: |
+            CN_MIRROR=${{ github.event.inputs.use_cn_mirror || 'false' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Success notification
+        run: |
+          echo "🎉 Successfully built and pushed Docker images!"
+          echo ""
+          echo "📦 Available images:"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:latest"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:latest"
+          echo ""
+          echo "🚀 Quick start:"
+          echo "docker run -p 18080:18080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:latest"
+          echo ""
+          echo "🔗 Visit: http://localhost:18080"
