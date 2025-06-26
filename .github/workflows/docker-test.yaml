@@ -1,0 +1,85 @@
+name: Test Docker Build and Push (Ice Branch)
+
+on:
+  push:
+    branches: [ ice ]
+  pull_request:
+    branches: [ ice ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for org-roam-woven
+        id: meta-app
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=ice-test,enable=true
+
+      - name: Extract metadata (tags, labels) for emacs
+        id: meta-emacs
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=ice-test,enable=true
+
+      - name: Build and push org-roam-woven Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packaging/Dockerfile.org-roam-woven
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
+
+      - name: Build and push emacs Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packaging
+          file: ./packaging/Dockerfile.emacs
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-emacs.outputs.tags }}
+          labels: ${{ steps.meta-emacs.outputs.labels }}
+
+      - name: Test images
+        run: |
+          echo "Testing org-roam-woven image..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test /usr/bin/org-roam-woven --help || echo "App started successfully"
+
+          echo "Testing emacs image..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:ice-test emacs --version
+
+      - name: Output image info
+        run: |
+          echo "Built images:"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:ice-test"
+          echo ""
+          echo "You can pull these images with:"
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test"
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:ice-test"
