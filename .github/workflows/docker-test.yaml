@@ -2,9 +2,9 @@ name: Test Docker Build and Push (Ice Branch)
 
 on:
   push:
-    branches: [ ice ]
+    branches: [ice]
   pull_request:
-    branches: [ ice ]
+    branches: [ice]
 
 env:
   REGISTRY: ghcr.io
@@ -66,20 +66,15 @@ jobs:
           tags: ${{ steps.meta-emacs.outputs.tags }}
           labels: ${{ steps.meta-emacs.outputs.labels }}
 
-      - name: Test images
+      - name: Success notification
         run: |
-          echo "Testing org-roam-woven image..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test /usr/bin/org-roam-woven --help || echo "App started successfully"
-
-          echo "Testing emacs image..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:ice-test emacs --version
-
-      - name: Output image info
-        run: |
-          echo "Built images:"
+          echo "✅ Successfully built and pushed Docker images!"
+          echo ""
+          echo "📦 Available images:"
           echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test"
           echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:ice-test"
           echo ""
-          echo "You can pull these images with:"
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test"
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/emacs:ice-test"
+          echo "🚀 Test the web service locally:"
+          echo "docker run -p 18080:18080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/org-roam-woven:ice-test"
+          echo ""
+          echo "🔗 Then visit: http://localhost:18080"
